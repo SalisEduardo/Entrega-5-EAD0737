@@ -14,6 +14,9 @@
 
 # ------------------------------------------------------------------------------
 
+
+
+
 #Pacotes
 
 # library(quantmod)   # nao foi necessaria
@@ -23,22 +26,25 @@ library(PortfolioAnalytics)
 library(PerformanceAnalytics)
 library(ROI.plugin.quadprog)
 library(ROI.plugin.glpk)
+library(tidyverse)
 
 # ------------------------------------------------------------------------------
 
-Acoes <- read.csv("port_acoes.csv",header = TRUE)
+df_inicial <- read.csv("port_acoes.csv",header = TRUE)
+Acoes <- df_inicial[, -1]
+row.names(Acoes) <- df_inicial[,1]
 
-names(Acoes)[1] <- "Data" # renomeando primeira coluna como data
 
-retornos <- Acoes
+retornos <- Return.calculate(Acoes,method = "log") %>% 
+            na.omit()
 
 # ------------------------------------------------
 
 # Avaliar as correlacoes dos retornos:
 
-noAcoes = ncol(Acoes) - 1 # numero de acoes (primeira coluna datas)
+noAcoes = ncol(retornos) 
 
-matrizCorrelacao = round(cor(as.matrix(Acoes[,2:(noAcoes+1)])),3)*100
+matrizCorrelacao = round(cor(as.matrix(retornos)),3)
 
 # ------------------------------------------------
 
