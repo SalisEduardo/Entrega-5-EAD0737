@@ -7,10 +7,12 @@
 
 # ------------------------------------------------------------------------------
 # Ideia: fazer o balanceamento da carteira recomendada (10SIM) pelo BTG do mês de novembro
-# O BTG recomenda um balanceamento igual
+# fonte https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual
 
 # Acoes foram obtidas pela API do alphavantage - extracao feita pelo python
-# obs: os dados disponiveis sao desde 2021-08-05 ate 021-11-19 , ja que a Raizen 	teve seu IPO recentemente
+# obs: os dados disponiveis sao desde 2019-01-02 ate 2021-12-01 
+# dados faltantes; Raizen antes do IPO e IGTA recentemente (troquei pelas acoes "JPSA3.SA")
+  # dropei raizen por problemas
 
 # ------------------------------------------------------------------------------
 #Pacotes
@@ -27,21 +29,61 @@ library(corrplot)
 
 # ------------------------------------------------------------------------------
 
-df_inicial <- read.csv("port_acoes.csv",header = TRUE)
-Acoes <- df_inicial[, -1]
-row.names(Acoes) <- df_inicial[,1]
+#df_inicial <- read.csv("port_acoes.csv",header = TRUE)
+#df_inicial <- read.csv("port_acoes_maior_periodo.csv",header = TRUE)
+#Acoes <- df_inicial[, -1]
+#row.names(Acoes) <- df_inicial[,1]
 
 
-retornos <- Return.calculate(Acoes,method = "log") %>% 
-            na.omit()
+#retornos <- Return.calculate(Acoes,method = "log") %>% 
+#           na.omit()
 
+#retornos <- Return.calculate(Acoes,method = "log") 
+
+library(quantmod)   
+#Seleção do período de análise  
+startDate = as.Date("2019-01-01")   
+endDate = as.Date("2021-11-30")  
+
+#Captura dos dados  
+
+getSymbols("PRIO3.SA" , src = "yahoo", from = startDate, to = endDate)  
+getSymbols("RAIZ4.SA" , src = "yahoo", from = startDate, to = endDate)  
+getSymbols("ITUB4.SA" , src = "yahoo", from = startDate, to = endDate)  
+getSymbols("JPSA3.SA" , src = "yahoo", from = startDate, to = endDate)
+getSymbols("ARZZ3.SA" , src = "yahoo", from = startDate, to = endDate)
+getSymbols("ENGI11.SA", src = "yahoo", from = startDate, to = endDate)
+getSymbols("SLCE3.SA" , src = "yahoo", from = startDate, to = endDate)
+getSymbols("WEGE3.SA" , src = "yahoo", from = startDate, to = endDate)
+getSymbols("GGBR4.SA" , src = "yahoo", from = startDate, to = endDate)
+getSymbols("PSSA3.SA" , src = "yahoo", from = startDate, to = endDate)
+
+#Cálculo dos retornos  
+
+PRIO3_RET  <- dailyReturn(PRIO3.SA)  
+RAIZ4_RET  <- dailyReturn(RAIZ4.SA)  
+ITUB4_RET  <- dailyReturn(ITUB4.SA) 
+JPSA3_RET  <- dailyReturn(JPSA3.SA) 
+ARZZ3_RET  <- dailyReturn(ARZZ3.SA) 
+ENGI11_RET <- dailyReturn(ENGI11.SA) 
+SLCE3_RET <- dailyReturn(SLCE3.SA) 
+WEGE3_RET <- dailyReturn(WEGE3.SA) 
+GGBR4_RET <- dailyReturn(GGBR4.SA) 
+PSSA3_RET <- dailyReturn(PSSA3.SA) 
+
+retornos <- as.data.frame(merge(PRIO3_RET, RAIZ4_RET, ITUB4_RET, JPSA3_RET, ARZZ3_RET, ENGI11_RET, SLCE3_RET, WEGE3_RET, GGBR4_RET, PSSA3_RET))
+tickers <- c("PRIO3.SA", "RAIZ4.SA", "ITUB4.SA", "JPSA3.SA","ARZZ3.SA", "ENGI11.SA" , "SLCE3.SA", "WEGE3.SA","GGBR4.SA","PSSA3.SA")
+
+colnames(retornos) <- tickers
+
+retornos
 # ------------------------------------------------
 
 # Avaliar as correlacoes dos retornos:
 
 noAcoes = ncol(retornos) 
 
-matrizCorrelacao = round(cor(as.matrix(retornos)),3)
+matrizCorrelacao = round(cor(as.matrix(retornos),use = "pairwise.complete.obs"),3)
 
 corrplot(matrizCorrelacao) # plot matriz de correlação
 
@@ -95,7 +137,7 @@ carteira = add.constraint(portfolio = carteira, type = "long_only")
 
 # Restricao 3 - para os pesos:
 
-carteira = add.constraint(portfolio = carteira, type = "box", min = 0.05, max = 0.2)
+carteira = add.constraint(portfolio = carteira, type = "box", min = 0.01, max = 0.2)
 
 
 FE = meanvar.efficient.frontier(portfolio = carteira, retornos, n.portfolios = 100)
@@ -115,7 +157,6 @@ carteira = add.objective(portfolio = carteira, type = "risk", name = "StdDev")
 
 # carteira <- add.constraint(portfolio = carteira, type = "return",return_target = 0.0008)
 
-
 # Otimizando a carteira...
 
 MinhaCarteira = optimize.portfolio(R = retornos,portfolio = carteira,optimize_method = "ROI",trace = TRUE)
@@ -124,17 +165,19 @@ MinhaCarteira # informacoes da carteira
 
 # Calcular o retorno medio (%) da carteira:
 
-mean(Return.portfolio(retornos,weights = extractWeights(MinhaCarteira)))*100
+retorno_esperado_amostra <- mean(Return.portfolio(retornos,weights = extractWeights(MinhaCarteira)))*100
+retorno_esperado_amostra
 
 # Verifique a carteira na fronteira eficiente!!!
 
 100*round(MinhaCarteira[["weights"]],4) # pesos em cada ativo (%)
 
+
 # Alocacoes:
 
 plot(MinhaCarteira)
 
-# Vamos verificar o desempenho dela fora da amostra 2017 a 2019...
+# Vamos verificar o desempenho dela fora da amostra 
 
 # Calcular os retornos nesse periodo:
 
@@ -142,11 +185,14 @@ RetornoMC = Return.portfolio(fora_amostra,weights = extractWeights(MinhaCarteira
 
 # Retorno medio (%) fora da amostra:
 
-mean(RetornoMC)*100
+retorno_medio_teste_MC <- mean(RetornoMC)*100
 
 # Desvio-padrao (%) fora da amostra:
 
-sd(RetornoMC)*100
+sd_retorno_test_MC  <- sd(RetornoMC)*100
+
+# Sharpe (simplificando a analisa para rf = 0)
+sharpe_teste_MC <- retorno_medio_teste_MC/sd_retorno_test_MC
 
 # Vizualizacao:
 
@@ -155,6 +201,33 @@ plot(RetornoMC)
 # Visualizar retornos acumulados (soma geometrica dos retornos dia a dia): 
 
 chart.CumReturns(RetornoMC)
+
+# --------------------------------------------------------------------------------------------------------
+# comparacao com benchmark de pesos iguais
+
+Retorno_Carteira_EW = Return.portfolio(fora_amostra,weights = carteira$assets)
+
+# Retorno medio EW (%) fora da amostra:
+
+retorno_medio_teste_EW <- mean(Retorno_Carteira_EW)*100
+
+# Desvio-padrao EW (%) fora da amostra:
+
+sd_retorno_test_EW  <- sd(Retorno_Carteira_EW)*100
+
+# Sharpe (simplificando a analisa para rf = 0)
+sharpe_teste_EW <- retorno_medio_teste_EW/sd_retorno_test_EW
+
+# Vizualizacao:
+
+plot(Retorno_Carteira_EW)
+
+# Visualizar retornos acumulados (soma geometrica dos retornos dia a dia): 
+
+chart.CumReturns(Retorno_Carteira_EW)
+
+
+
 
 
 
