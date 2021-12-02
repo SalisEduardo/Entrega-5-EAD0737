@@ -26,21 +26,11 @@ library(ROI.plugin.quadprog)
 library(ROI.plugin.glpk)
 library(tidyverse)
 library(corrplot)
+library(quantmod)   
 
 # ------------------------------------------------------------------------------
 
-#df_inicial <- read.csv("port_acoes.csv",header = TRUE)
-#df_inicial <- read.csv("port_acoes_maior_periodo.csv",header = TRUE)
-#Acoes <- df_inicial[, -1]
-#row.names(Acoes) <- df_inicial[,1]
 
-
-#retornos <- Return.calculate(Acoes,method = "log") %>% 
-#           na.omit()
-
-#retornos <- Return.calculate(Acoes,method = "log") 
-
-library(quantmod)   
 #Seleção do período de análise  
 startDate = as.Date("2019-01-01")   
 endDate = as.Date("2021-11-30")  
@@ -48,7 +38,7 @@ endDate = as.Date("2021-11-30")
 #Captura dos dados  
 
 getSymbols("PRIO3.SA" , src = "yahoo", from = startDate, to = endDate)  
-getSymbols("RAIZ4.SA" , src = "yahoo", from = startDate, to = endDate)  
+#getSymbols("RAIZ4.SA" , src = "yahoo", from = startDate, to = endDate)  
 getSymbols("ITUB4.SA" , src = "yahoo", from = startDate, to = endDate)  
 getSymbols("JPSA3.SA" , src = "yahoo", from = startDate, to = endDate)
 getSymbols("ARZZ3.SA" , src = "yahoo", from = startDate, to = endDate)
@@ -61,7 +51,7 @@ getSymbols("PSSA3.SA" , src = "yahoo", from = startDate, to = endDate)
 #Cálculo dos retornos  
 
 PRIO3_RET  <- dailyReturn(PRIO3.SA)  
-RAIZ4_RET  <- dailyReturn(RAIZ4.SA)  
+#RAIZ4_RET  <- dailyReturn(RAIZ4.SA)  
 ITUB4_RET  <- dailyReturn(ITUB4.SA) 
 JPSA3_RET  <- dailyReturn(JPSA3.SA) 
 ARZZ3_RET  <- dailyReturn(ARZZ3.SA) 
@@ -71,8 +61,15 @@ WEGE3_RET <- dailyReturn(WEGE3.SA)
 GGBR4_RET <- dailyReturn(GGBR4.SA) 
 PSSA3_RET <- dailyReturn(PSSA3.SA) 
 
-retornos <- as.data.frame(merge(PRIO3_RET, RAIZ4_RET, ITUB4_RET, JPSA3_RET, ARZZ3_RET, ENGI11_RET, SLCE3_RET, WEGE3_RET, GGBR4_RET, PSSA3_RET))
-tickers <- c("PRIO3.SA", "RAIZ4.SA", "ITUB4.SA", "JPSA3.SA","ARZZ3.SA", "ENGI11.SA" , "SLCE3.SA", "WEGE3.SA","GGBR4.SA","PSSA3.SA")
+#retornos <- as.data.frame(merge(PRIO3_RET, RAIZ4_RET, ITUB4_RET, JPSA3_RET, ARZZ3_RET, ENGI11_RET, SLCE3_RET, WEGE3_RET, GGBR4_RET, PSSA3_RET))
+retornos <- as.data.frame(merge(PRIO3_RET, ITUB4_RET, JPSA3_RET, ARZZ3_RET, ENGI11_RET, SLCE3_RET, WEGE3_RET, GGBR4_RET, PSSA3_RET))
+
+
+#tickers <- c("PRIO3.SA", "RAIZ4.SA", "ITUB4.SA", "JPSA3.SA","ARZZ3.SA", "ENGI11.SA" , "SLCE3.SA", "WEGE3.SA","GGBR4.SA","PSSA3.SA")
+
+tickers <- c("PRIO3.SA", "ITUB4.SA", "JPSA3.SA","ARZZ3.SA", "ENGI11.SA" , "SLCE3.SA", "WEGE3.SA","GGBR4.SA","PSSA3.SA")
+
+
 
 colnames(retornos) <- tickers
 
@@ -111,12 +108,15 @@ cbind.data.frame(stock1 = rownames(matrizCorrelacao)[index[,1]],
 
 # ------------------------------------------------
 
-# 80% dos dados dentro da amostra
 
-split_dados <- round(0.8 * nrow(retornos))
+## split_dados <- round(0.8 * nrow(retornos))
+##  amostra = retornos[1:split_dados,] # divisao com base nos dados
+##  fora_amostra = retornos[split_dados:nrow(retornos),]
 
-amostra = retornos[1:split_dados,] # divisao com base nos dados
-fora_amostra = retornos[split_dados:nrow(retornos),]
+# Periodo de teste de sesempenho da carteira e o mes de novembro
+
+amostra <- retornos[which(row.names(retornos) == "2019-01-02") : which(row.names(retornos) == "2019-10-29"), , drop = FALSE]
+fora_amostra <- retornos[which(row.names(retornos) == "2021-11-01") : which(row.names(retornos) == "2021-11-29"), , drop = FALSE]
 
 summary(amostra) # estatisticas descritivas retornos
 
