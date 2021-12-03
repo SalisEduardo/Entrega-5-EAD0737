@@ -1,0 +1,285 @@
+---
+title: "Relatorio"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+library(PortfolioAnalytics)
+library(PerformanceAnalytics)
+
+```
+
+# Captura dos dados
+
+Foi feita através da biblioteca do R `quantmod`. A nossa ideia foi fazer o balanceamento da [carteira recomendada (10SIM) pelo BTG do mês de novembro](https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual). O horizonte temporal foi de 01-01-2019 a 30-11-2021.
+
+```{r echo=FALSE, message=FALSE, results='hide'}
+startDate = as.Date("2019-01-01")   
+endDate = as.Date("2021-11-30")  
+
+tickers <- c("PRIO3.SA", "ITUB4.SA", "JPSA3.SA", "ARZZ3.SA", "ENGI11.SA", 
+             "SLCE3.SA", "WEGE3.SA", "GGBR4.SA", "PSSA3.SA")
+
+quantmod::getSymbols(tickers , src = "yahoo", from = startDate, to = endDate)
+```
+
+# Cálculo dos retornos
+
+Primeiro calculos os retornos diários dos dados importados.
+
+```{r echo=FALSE}
+extract_name <- function(df){
+  
+  df %>% 
+    names() %>% 
+    purrr::pluck(1) %>% 
+    stringr::str_extract(".+(?=.SA.Open)")
+}
+
+daily_return <- function(tk){
+  
+  quantmod::dailyReturn(tk) %>% 
+    broom::tidy() %>% 
+    dplyr::mutate(ticker = extract_name(tk)) %>% 
+    dplyr::select(-series)
+}
+
+data_list <- list(PRIO3.SA, ITUB4.SA, JPSA3.SA, ARZZ3.SA, ENGI11.SA, 
+                  SLCE3.SA, WEGE3.SA, GGBR4.SA, PSSA3.SA)
+
+tab_ret <- purrr::map_dfr(data_list, daily_return)
+
+returns <- 
+  tab_ret %>% 
+  tidyr::pivot_wider(
+    names_from = ticker,
+    values_from = value
+  ) %>% 
+  dplyr::rename(date = index)
+
+returns %>% 
+  head(5) %>% 
+  knitr::kable(digits = 4)
+```
+
+# Avaliar as correlações dos retornos
+
+Avaliando as correlações dos retornos podemos ver que...
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m_corrr <- returns %>% 
+  dplyr::select(-date) %>% 
+  corrr::correlate() 
+
+m_corrr %>% 
+  corrr::rearrange() %>% 
+  corrr::shave() %>% 
+  corrr::rplot(colours = "darkred")
+```
+
+Também temos a correlação média entre essas ações e os pares de ações que mais possuem correlação entre si.
+
+```{r echo=FALSE}
+# mudando o formato do dado
+tidy_corrr <- m_corrr %>% 
+  tidyr::pivot_longer(
+    cols = PRIO3:PSSA3,
+    names_to = "tk_2",
+    values_to = "corr"
+  ) %>% 
+  dplyr::rename(tk_1 = term)
+  
+# incerteza sobre ser uma boa metrica
+tidy_corrr %>% 
+  dplyr::summarise(corr_media = mean(corr, na.rm = TRUE)) %>% 
+  knitr::kable()
+
+# pares de acoes com alta correlacao
+tidy_corrr %>% 
+  dplyr::filter(abs(corr) >= 0.5 & abs(corr) <= 1) %>% 
+  knitr::kable()
+```
+
+# Montando a carteira
+
+Antes de partir para a construção da carteira, dividimos nossos dados em `amostra` e `fora_amostra`, o primeiro para montarmos a carteira e o segundo para testarmos, que abrange apenas o mês de novembro de 2021. Além disso, abaixo temos as estatísticas básicas da nossa `amostra`.
+
+```{r echo=FALSE}
+# divisão da amostra
+amostra <- returns %>% dplyr::filter(date <= "2021-10-29")
+fora_amostra <- returns %>% dplyr::anti_join(amostra, by = "date")
+
+# estatisticas descritivas retornos
+amostra %>% 
+  dplyr::select(-date) %>% 
+  summary() %>% 
+  as.data.frame() %>% 
+  tibble::as_tibble() %>% 
+  dplyr::mutate(
+    nome = stringr::str_squish(Var2)
+  ) %>% 
+  tidyr::separate(Freq, c("Stat", "Value"), ":") %>% 
+  dplyr::select(-Var1, -Var2) %>% 
+  dplyr::mutate(Value = as.double(Value)) %>% 
+  tidyr::pivot_wider(
+    names_from = nome,
+    values_from = Value
+  ) %>% 
+  knitr::kable(digits = 4)
+ 
+```
+
+Para montar e avaliar a carteira utilizamos dos pacotes `PortfolioAnalytics` e `PerformanceAnalytics`. Adicionamos 3 restrições a ela: totalmente investida, apenas posições compradas e pesos com mínimo de 0.01 e máximo de 0.2 do tipo *box*. Abaixo está o gráfico da fronteira eficiente considerando o argumento de `n.portfolios = 100`.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# especificacoes da carteira:
+carteira_begin <- portfolio.spec(assets = tickers) 
+
+# Restricao 1 - carteira totalmente investida:
+carteira_full_investment <- add.constraint(portfolio = carteira_begin, 
+                                          type = "full_investment")
+
+# Restricao 2 - apenas posicoes compradas:
+carteira_long_only <- add.constraint(portfolio = carteira_full_investment, 
+                          type = "long_only")
+
+# Restricao 3 - para os pesos:
+carteira_box = add.constraint(portfolio = carteira_long_only, 
+                              type = "box", 
+                              min = 0.01, max = 0.2)
+
+# criando um xts dos retornos
+xts_amostra <- amostra %>% timetk::tk_xts()
+
+# primeiro jeito
+ef_mean_var <- create.EfficientFrontier(R = xts_amostra,
+                                        portfolio = carteira_box,
+                                        type = "mean-var",
+                                        n.portfolios = 100,
+                                        )
+
+chart.EfficientFrontier(ef_mean_var,
+                        match.col = "StdDev")
+```
+
+Também é possível analisar o gráfico de Risco e Retorno da seguinte maneira:
+
+```{r echo=FALSE}
+# segundo jeito
+FE <- meanvar.efficient.frontier(portfolio = carteira_box, 
+                                 xts_amostra, 
+                                 n.portfolios = 100)
+plot(100*FE[,2],
+     100*FE[,1],
+     xlab="Risco (%)",
+     ylab = "Retorno (%)",
+     col="blue",
+     main = "Fronteira Eficiente")
+```
+
+# Processo de otimizacao
+
+Para o processo de otimização, consideramos uma carteira de variância mínima, que foi montada da seguinte maneira: 
+```{r echo=FALSE}
+# 1. Carteira de variancia minima (CVM) - eficiente e com menor risco...
+carteira_cvm <- add.objective(portfolio = carteira_box, type = "risk", name = "StdDev")
+
+my_carteira <- optimize.portfolio(R = xts_amostra,
+                                  portfolio = carteira_cvm,
+                                  optimize_method = "ROI",
+                                  trace = TRUE)
+
+my_carteira 
+```
+
+O retorno médio da carteira:
+```{r echo=FALSE}
+# Retorno medio (%) da carteira:
+Return.portfolio(xts_amostra, weights = extractWeights(my_carteira)) %>% 
+  mean() * 100
+```
+
+Pesos em cada ativo: 
+```{r echo=FALSE}
+# A carteira está fronteira eficiente?
+round(my_carteira[["weights"]], 4) * 100 # pesos em cada ativo (%)
+```
+
+Alocações da minha carteira:
+```{r echo=FALSE}
+# Alocacoes:
+plot(my_carteira)
+```
+
+# Teste fora da amostra
+
+Agora que temos a carteira, iremos testar com o conjunto de dados `fora_amostra`, que definimos antes. Temos o seguintes resultados: 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Retornos nesse periodo:
+xts_fora_mostra <- fora_amostra %>% timetk::tk_xts()
+
+test_returns = Return.portfolio(xts_fora_mostra,
+                             weights = extractWeights(my_carteira))
+
+
+test_returns %>% 
+  broom::tidy() %>% 
+  dplyr::select(-series) %>% 
+  dplyr::rename(date = index) %>% 
+  dplyr::summarise(
+    test_mean_return = mean(value) * 100,
+    test_sd_return = sd(value) * 100,
+    test_sharp = test_mean_return / test_sd_return
+  ) %>% 
+  knitr::kable()
+
+```
+
+## Visualização
+```{r echo=FALSE, eval=TRUE}
+plot(test_returns, col = "darkred", 
+     main = "Retornos fora da amostra")
+```
+
+### Retornos acumulados
+
+```{r echo=FALSE, eval=TRUE}
+# Visualizar retornos acumulados (soma geometrica dos retornos dia a dia): 
+chart.CumReturns(test_returns)
+```
+
+
+# Benchmark com pesos iguais
+```{r echo=FALSE, eval=TRUE}
+ew_returns <- Return.portfolio(xts_fora_mostra, 
+                               weights = carteira_cvm$assets) 
+  
+ew_returns %>% 
+  broom::tidy() %>% 
+  dplyr::select(-series) %>% 
+  dplyr::rename(date = index) %>% 
+  dplyr::summarise(
+    ew_mean_return = mean(value) * 100,
+    ew_sd_return = sd(value) * 100,
+    ew_sharp = ew_mean_return / ew_sd_return
+  ) %>% 
+  knitr::kable()
+```
+
+## Visualização
+```{r echo=FALSE, eval=TRUE}
+plot(ew_returns)
+```
+
+### Retornos acumulados
+ 
+```{r echo=FALSE, eval=TRUE}
+chart.CumReturns(ew_returns)
+```
+
+
+
+
+
