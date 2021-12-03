@@ -2,37 +2,32 @@
 # FEAUSP
 # EAD737 - Topicos Avancados de Financas
 # Prof. Leandro Maciel (leandromaciel@usp.br)
-# Segundo Semestre de 2020
-# ------------------------------------------------
-
+# Segundo Semestre de 2021
 # ------------------------------------------------------------------------------
+# Autores: Douglas S Cardoso, Eduardo Salis, Nicolas Zanoni
 # Ideia: fazer o balanceamento da carteira recomendada (10SIM) pelo BTG do mês de novembro
-# fonte https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual
+# Fonte: https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual
 
-# Acoes foram obtidas pela API do alphavantage - extracao feita pelo python
-# obs: os dados disponiveis sao desde 2019-01-02 ate 2021-12-01 
-# dados faltantes; Raizen antes do IPO e IGTA recentemente (troquei pelas acoes "JPSA3.SA")
-  # dropei raizen por problemas
+# Dependências ------------------------------------------------------------
 
-# ------------------------------------------------------------------------------
-#Pacotes
+# library(magrittr)
+# library(PortfolioAnalytics)
+# library(PerformanceAnalytics)
+# library(readxl)
+# library(xts)
+# library(ROI.plugin.quadprog)
+# library(ROI.plugin.glpk)
+# library(tidyverse)
+# library(corrplot)
+# library(quantmod)   
+# library(corrr)
 
-# library(quantmod)   # nao foi necessaria
+# Importando pacotes ------------------------------------------------------
 library(magrittr)
 library(PortfolioAnalytics)
 library(PerformanceAnalytics)
 
-library(readxl)
-library(xts)
-library(ROI.plugin.quadprog)
-library(ROI.plugin.glpk)
-library(tidyverse)
-library(corrplot)
-library(quantmod)   
-library(corrr)
-
 # Captura dos dados -------------------------------------------------------
-  
 startDate = as.Date("2019-01-01")   
 endDate = as.Date("2021-11-30")  
 
