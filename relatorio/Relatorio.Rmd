@@ -10,11 +10,10 @@ library(PerformanceAnalytics)
 
 ```
 
-# Captura dos dados
-
+## Captura dos dados
 Foi feita através da biblioteca do R `quantmod`. A nossa ideia foi fazer o balanceamento da [carteira recomendada (10SIM) pelo BTG do mês de novembro](https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual). O horizonte temporal foi de 01-01-2019 a 30-11-2021.
 
-```{r echo=FALSE, message=FALSE, results='hide'}
+```{r echo=FALSE, eval = FALSE, message=FALSE, results='hide'}
 startDate = as.Date("2019-01-01")   
 endDate = as.Date("2021-11-30")  
 
@@ -24,11 +23,10 @@ tickers <- c("PRIO3.SA", "ITUB4.SA", "JPSA3.SA", "ARZZ3.SA", "ENGI11.SA",
 quantmod::getSymbols(tickers , src = "yahoo", from = startDate, to = endDate)
 ```
 
-# Cálculo dos retornos
-
+## Cálculo dos retornos
 Primeiro calculos os retornos diários dos dados importados.
 
-```{r echo=FALSE}
+```{r echo=FALSE, eval=FALSE}
 extract_name <- function(df){
   
   df %>% 
@@ -59,15 +57,19 @@ returns <-
   dplyr::rename(date = index)
 
 returns %>% 
+  readr::write_csv("returns.csv")
+
+returns %>% 
   head(5) %>% 
   knitr::kable(digits = 4)
 ```
 
-# Avaliar as correlações dos retornos
-
+## Avaliar as correlações dos retornos
 Avaliando as correlações dos retornos podemos ver que...
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, out.width="50%", fig.align='center'}
+
+returns <- readr::read_csv("returns.csv")
 m_corrr <- returns %>% 
   dplyr::select(-date) %>% 
   corrr::correlate() 
@@ -78,9 +80,8 @@ m_corrr %>%
   corrr::rplot(colours = "darkred")
 ```
 
-Também temos a correlação média entre essas ações e os pares de ações que mais possuem correlação entre si.
-
-```{r echo=FALSE}
+```{r echo=FALSE, eval = FALSE}
+#Também temos a correlação média entre essas ações e os pares de ações que mais possuem correlação entre si.
 # mudando o formato do dado
 tidy_corrr <- m_corrr %>% 
   tidyr::pivot_longer(
@@ -101,15 +102,20 @@ tidy_corrr %>%
   knitr::kable()
 ```
 
-# Montando a carteira
+## Montando a carteira
 
-Antes de partir para a construção da carteira, dividimos nossos dados em `amostra` e `fora_amostra`, o primeiro para montarmos a carteira e o segundo para testarmos, que abrange apenas o mês de novembro de 2021. Além disso, abaixo temos as estatísticas básicas da nossa `amostra`.
+Antes de partir para a construção da carteira, dividimos nossos dados em `amostra` e `fora_amostra`, o primeiro para montarmos a carteira e o segundo para testarmos, que abrange apenas o mês de novembro de 2021. 
 
-```{r echo=FALSE}
+```{r echo = FALSE}
 # divisão da amostra
 amostra <- returns %>% dplyr::filter(date <= "2021-10-29")
 fora_amostra <- returns %>% dplyr::anti_join(amostra, by = "date")
 
+```
+
+
+```{r echo=FALSE, eval = FALSE}
+#Além disso, abaixo temos as estatísticas básicas da nossa `amostra`.
 # estatisticas descritivas retornos
 amostra %>% 
   dplyr::select(-date) %>% 
@@ -130,9 +136,11 @@ amostra %>%
  
 ```
 
-Para montar e avaliar a carteira utilizamos dos pacotes `PortfolioAnalytics` e `PerformanceAnalytics`. Adicionamos 3 restrições a ela: totalmente investida, apenas posições compradas e pesos com mínimo de 0.01 e máximo de 0.2 do tipo *box*. Abaixo está o gráfico da fronteira eficiente considerando o argumento de `n.portfolios = 100`.
+Para montar e avaliar a carteira utilizamos dos pacotes `PortfolioAnalytics` e `PerformanceAnalytics`. Adicionamos 3 restrições a ela: totalmente investida, apenas posições compradas e pesos com mínimo de 0.01 e máximo de 0.2 do tipo *box*. Abaixo estão duas representações da fronteira eficiente considerando o argumento de `n.portfolios = 100`.
 
-```{r echo=FALSE, warning=FALSE, message=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, out.width="50%", fig.align='center', strip.white=TRUE}
+tickers <- c("PRIO3.SA", "ITUB4.SA", "JPSA3.SA", "ARZZ3.SA", "ENGI11.SA", 
+             "SLCE3.SA", "WEGE3.SA", "GGBR4.SA", "PSSA3.SA")
 # especificacoes da carteira:
 carteira_begin <- portfolio.spec(assets = tickers) 
 
@@ -165,7 +173,7 @@ chart.EfficientFrontier(ef_mean_var,
 
 Também é possível analisar o gráfico de Risco e Retorno da seguinte maneira:
 
-```{r echo=FALSE}
+```{r echo=FALSE, out.width="50%", fig.align='center' }
 # segundo jeito
 FE <- meanvar.efficient.frontier(portfolio = carteira_box, 
                                  xts_amostra, 
@@ -207,7 +215,7 @@ round(my_carteira[["weights"]], 4) * 100 # pesos em cada ativo (%)
 ```
 
 Alocações da minha carteira:
-```{r echo=FALSE}
+```{r echo=FALSE, out.width="50%", fig.align='center'}
 # Alocacoes:
 plot(my_carteira)
 ```
@@ -238,14 +246,14 @@ test_returns %>%
 ```
 
 ## Visualização
-```{r echo=FALSE, eval=TRUE}
+```{r echo=FALSE, eval=TRUE, out.width="50%", fig.align='center'}
 plot(test_returns, col = "darkred", 
      main = "Retornos fora da amostra")
 ```
 
 ### Retornos acumulados
 
-```{r echo=FALSE, eval=TRUE}
+```{r echo=FALSE, eval=TRUE, out.width="50%", fig.align='center'}
 # Visualizar retornos acumulados (soma geometrica dos retornos dia a dia): 
 chart.CumReturns(test_returns)
 ```
@@ -269,13 +277,13 @@ ew_returns %>%
 ```
 
 ## Visualização
-```{r echo=FALSE, eval=TRUE}
+```{r echo=FALSE, eval=TRUE, out.width="50%", fig.align='center'}
 plot(ew_returns)
 ```
 
 ### Retornos acumulados
  
-```{r echo=FALSE, eval=TRUE}
+```{r echo=FALSE, eval=TRUE, out.width="50%", fig.align='center'}
 chart.CumReturns(ew_returns)
 ```
 

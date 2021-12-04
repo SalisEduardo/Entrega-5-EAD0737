@@ -1,15 +1,4 @@
-# ------------------------------------------------
-# FEAUSP
-# EAD737 - Topicos Avancados de Financas
-# Prof. Leandro Maciel (leandromaciel@usp.br)
-# Segundo Semestre de 2021
-# ------------------------------------------------------------------------------
-# Autores: Douglas S Cardoso, Eduardo Salis, Nicolas Zanoni
-# Ideia: fazer o balanceamento da carteira recomendada (10SIM) pelo BTG do mês de novembro
-# Fonte: https://www.poupardinheiro.com.br/10-acoes-para-investir-segundo-o-btg-pactual
-
 # Dependências ------------------------------------------------------------
-
 # library(magrittr)
 # library(PortfolioAnalytics)
 # library(PerformanceAnalytics)
@@ -27,48 +16,9 @@ library(magrittr)
 library(PortfolioAnalytics)
 library(PerformanceAnalytics)
 
-# Captura dos dados -------------------------------------------------------
-startDate = as.Date("2019-01-01")   
-endDate = as.Date("2021-11-30")  
-
-tickers <- c("PRIO3.SA", "ITUB4.SA", "JPSA3.SA", "ARZZ3.SA", "ENGI11.SA", 
-             "SLCE3.SA", "WEGE3.SA", "GGBR4.SA", "PSSA3.SA")
-
-quantmod::getSymbols(tickers , src = "yahoo", from = startDate, to = endDate)  
-
-# Cálculo dos retornos  ---------------------------------------------------
-extract_name <- function(df){
-  
-  df %>% 
-    names() %>% 
-    purrr::pluck(1) %>% 
-    stringr::str_extract(".+(?=.SA.Open)")
-}
-
-daily_return <- function(tk){
-  
-  quantmod::dailyReturn(tk) %>% 
-    broom::tidy() %>% 
-    dplyr::mutate(ticker = extract_name(tk)) %>% 
-    dplyr::select(-series)
-}
-
-data_list <- list(PRIO3.SA, ITUB4.SA, JPSA3.SA, ARZZ3.SA, ENGI11.SA, 
-                  SLCE3.SA, WEGE3.SA, GGBR4.SA, PSSA3.SA)
-
-tab_ret <- purrr::map_dfr(data_list, daily_return)
-
-returns <- 
-  tab_ret %>% 
-  tidyr::pivot_wider(
-    names_from = ticker,
-    values_from = value
-  ) %>% 
-  dplyr::rename(date = index)
-
-returns
-
 # Avaliar as correlacoes dos retornos -------------------------------------
+returns <- readr::read_csv("dados/returns.csv")
+
 m_corrr <- returns %>% 
   dplyr::select(-date) %>% 
   corrr::correlate() 
@@ -215,7 +165,7 @@ ew_returns %>%
   )
 
 # Vizualizacao:
-plot(ew_returns)
+plot(ew_returns, main = "Equal Weighted", col = "darkred")
 
 # Visualizar retornos acumulados (soma geometrica dos retornos dia a dia): 
-chart.CumReturns(ew_returns)
+chart.CumReturns(ew_returns, main = "Equal Weighted")
